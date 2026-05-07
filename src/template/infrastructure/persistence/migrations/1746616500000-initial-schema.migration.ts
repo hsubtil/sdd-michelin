@@ -5,7 +5,7 @@ export class InitialSchema1746616500000 implements MigrationInterface {
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
-      CREATE TABLE "templates" (
+      CREATE TABLE IF NOT EXISTS "templates" (
         "id" uuid NOT NULL,
         "name" character varying(50) NOT NULL,
         "current_version" integer NOT NULL,
@@ -16,7 +16,7 @@ export class InitialSchema1746616500000 implements MigrationInterface {
     `);
 
     await queryRunner.query(`
-      CREATE TABLE "template_versions" (
+      CREATE TABLE IF NOT EXISTS "template_versions" (
         "id" uuid NOT NULL,
         "template_id" uuid NOT NULL,
         "version_number" integer NOT NULL,
@@ -30,7 +30,7 @@ export class InitialSchema1746616500000 implements MigrationInterface {
     `);
 
     await queryRunner.query(`
-      CREATE TABLE "template_variables" (
+      CREATE TABLE IF NOT EXISTS "template_variables" (
         "id" uuid NOT NULL,
         "template_version_id" uuid NOT NULL,
         "name" character varying(100) NOT NULL,
@@ -41,7 +41,7 @@ export class InitialSchema1746616500000 implements MigrationInterface {
     `);
 
     await queryRunner.query(`
-      CREATE TABLE "prompts" (
+      CREATE TABLE IF NOT EXISTS "prompts" (
         "id" uuid NOT NULL,
         "template_id" uuid NOT NULL,
         "version_used" integer NOT NULL,
@@ -54,9 +54,9 @@ export class InitialSchema1746616500000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query('DROP TABLE "prompts"');
-    await queryRunner.query('DROP TABLE "template_variables"');
-    await queryRunner.query('DROP TABLE "template_versions"');
-    await queryRunner.query('DROP TABLE "templates"');
+    await queryRunner.query('DROP TABLE IF EXISTS "prompts"');
+    await queryRunner.query('DROP TABLE IF EXISTS "template_variables"');
+    await queryRunner.query('DROP TABLE IF EXISTS "template_versions"');
+    await queryRunner.query('DROP TABLE IF EXISTS "templates"');
   }
 }
