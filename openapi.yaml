@@ -1,0 +1,729 @@
+openapi: 3.0.0
+
+info:
+  title: Prompt Versioning API
+  description: REST API for managing and versioning prompt templates
+  version: 1.0.0
+  contact:
+    name: API Support
+
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Development server
+  - url: /api/v1
+    description: Relative path
+
+tags:
+  - name: Templates
+    description: Manage prompt templates
+  - name: Versions
+    description: Access template versions
+  - name: Prompts
+    description: Generate and manage prompts
+
+paths:
+  /template:
+    post:
+      tags:
+        - Templates
+      operationId: createTemplate
+      summary: Create a new template with initial content
+      description: Creates a new prompt template with version 1. Template name must be unique and not exceed 50 characters.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTemplateRequest'
+            examples:
+              simpleTemplate:
+                summary: Simple template with tags
+                value:
+                  name: Customer Email
+                  tags:
+                    - email
+                    - customer
+                  content: "Hello {{name}}, thank you for your business!"
+                  variables:
+                    - name: name
+                      defaultValue: "Customer"
+              templateWithVariables:
+                summary: Template with required and optional variables
+                value:
+                  name: Onboarding Email
+                  tags:
+                    - email
+                    - onboarding
+                  content: "Hi {{firstName}} {{lastName}}, welcome to {{company}}!"
+                  variables:
+                    - name: firstName
+                    - name: lastName
+                    - name: company
+                      defaultValue: "Acme Corp"
+      responses:
+        '201':
+          description: Template created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateResponse'
+              examples:
+                created:
+                  summary: Created template with version 1
+                  value:
+                    id: 550e8400-e29b-41d4-a716-446655440000
+                    name: Customer Email
+                    tags:
+                      - email
+                      - customer
+                    currentVersion: 1
+                    createdAt: '2026-05-07T10:30:00Z'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              examples:
+                invalidRequest:
+                  summary: Missing required field
+                  value:
+                    type: about:blank
+                    title: Validation Error
+                    status: 400
+                    detail: "Validation failed: name is required"
+        '409':
+          description: Template already exists with this name
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConflictErrorResponse'
+              examples:
+                alreadyExists:
+                  summary: Template name conflict
+                  value:
+                    type: about:blank
+                    title: Template Already Exists
+                    status: 409
+                    detail: "A template with name 'Customer Email' already exists"
+
+  /template/{id}:
+    get:
+      tags:
+        - Templates
+      operationId: getTemplate
+      summary: Retrieve a template with its latest version
+      description: Returns the template metadata along with its current (latest) version content and variables.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Template UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Template retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateWithVersionResponse'
+              examples:
+                withVersion:
+                  summary: Template with current version
+                  value:
+                    id: 550e8400-e29b-41d4-a716-446655440000
+                    name: Customer Email
+                    tags:
+                      - email
+                      - customer
+                    currentVersion: 2
+                    createdAt: '2026-05-07T10:30:00Z'
+                    content: "Hello {{name}}, thank you for being awesome!"
+                    variables:
+                      - id: 660e8400-e29b-41d4-a716-446655440001
+                        name: name
+                        defaultValue: "Customer"
+        '404':
+          description: Template not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundErrorResponse'
+              examples:
+                notFound:
+                  summary: Template not found
+                  value:
+                    type: about:blank
+                    title: Template Not Found
+                    status: 404
+                    detail: "Template with id '550e8400-e29b-41d4-a716-446655440000' not found"
+    put:
+      tags:
+        - Templates
+      operationId: updateTemplate
+      summary: Update template content (creates a new version)
+      description: Updates the template's content and/or tags, creating a new version. Version numbering increments automatically.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Template UUID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTemplateRequest'
+            examples:
+              updateContent:
+                summary: Update content only
+                value:
+                  content: "Hey {{name}}, thanks for sticking with us!"
+              updateTags:
+                summary: Update tags only
+                value:
+                  tags:
+                    - email
+                    - customer
+                    - retention
+              updateBoth:
+                summary: Update content and tags
+                value:
+                  content: "Hi {{firstName}}, welcome aboard!"
+                  tags:
+                    - email
+                    - onboarding
+      responses:
+        '200':
+          description: Template updated successfully with new version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateWithVersionResponse'
+              examples:
+                updated:
+                  summary: Updated template with new version
+                  value:
+                    id: 550e8400-e29b-41d4-a716-446655440000
+                    name: Customer Email
+                    tags:
+                      - email
+                      - customer
+                      - retention
+                    currentVersion: 3
+                    createdAt: '2026-05-07T10:30:00Z'
+                    content: "Hey {{name}}, thanks for sticking with us!"
+                    variables:
+                      - id: 660e8400-e29b-41d4-a716-446655440001
+                        name: name
+                        defaultValue: "Customer"
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '404':
+          description: Template not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundErrorResponse'
+
+  /template/{id}/versions:
+    get:
+      tags:
+        - Versions
+      operationId: getTemplateVersions
+      summary: Retrieve all versions of a template
+      description: Returns an array of all versions for the template, ordered by version number (descending, newest first).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Template UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Versions retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PromptVersion'
+              examples:
+                allVersions:
+                  summary: Multiple versions of a template
+                  value:
+                    - versionNumber: 3
+                      templateId: 550e8400-e29b-41d4-a716-446655440000
+                      content: "Hey {{name}}, thanks for sticking with us!"
+                      variables:
+                        - id: 660e8400-e29b-41d4-a716-446655440001
+                          name: name
+                          defaultValue: "Customer"
+                      tags:
+                        - email
+                        - customer
+                        - retention
+                      createdAt: '2026-05-07T12:00:00Z'
+                    - versionNumber: 2
+                      templateId: 550e8400-e29b-41d4-a716-446655440000
+                      content: "Hello {{name}}, thank you for being awesome!"
+                      variables:
+                        - id: 660e8400-e29b-41d4-a716-446655440001
+                          name: name
+                          defaultValue: "Customer"
+                      tags:
+                        - email
+                        - customer
+                      createdAt: '2026-05-07T11:00:00Z'
+                    - versionNumber: 1
+                      templateId: 550e8400-e29b-41d4-a716-446655440000
+                      content: "Hello {{name}}, thank you for your business!"
+                      variables:
+                        - id: 660e8400-e29b-41d4-a716-446655440001
+                          name: name
+                          defaultValue: "Customer"
+                      tags:
+                        - email
+                        - customer
+                      createdAt: '2026-05-07T10:30:00Z'
+        '404':
+          description: Template not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundErrorResponse'
+
+  /template/{id}/versions/{versionNumber}:
+    get:
+      tags:
+        - Versions
+      operationId: getTemplateVersion
+      summary: Retrieve a specific version of a template
+      description: Returns the exact content and configuration of the template at the specified version number.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Template UUID
+          schema:
+            type: string
+            format: uuid
+        - name: versionNumber
+          in: path
+          required: true
+          description: Version number (starting from 1)
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Version retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromptVersion'
+              examples:
+                version:
+                  summary: Specific template version
+                  value:
+                    versionNumber: 2
+                    templateId: 550e8400-e29b-41d4-a716-446655440000
+                    content: "Hello {{name}}, thank you for being awesome!"
+                    variables:
+                      - id: 660e8400-e29b-41d4-a716-446655440001
+                        name: name
+                        defaultValue: "Customer"
+                    tags:
+                      - email
+                      - customer
+                    createdAt: '2026-05-07T11:00:00Z'
+        '404':
+          description: Template or version not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundErrorResponse'
+
+  /prompt:
+    post:
+      tags:
+        - Prompts
+      operationId: generatePrompt
+      summary: Generate a new prompt from a template
+      description: Generates a prompt by substituting variables into the template's current version. Missing optional variables use their default values. Missing required variables (no default) cause a validation error.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GeneratePromptRequest'
+            examples:
+              withAllVariables:
+                summary: Generate with all variables provided
+                value:
+                  templateId: 550e8400-e29b-41d4-a716-446655440000
+                  variables:
+                    name: John Doe
+              withPartialVariables:
+                summary: Generate with some variables (use defaults for others)
+                value:
+                  templateId: 550e8400-e29b-41d4-a716-446655440000
+                  variables:
+                    name: Jane Smith
+              noVariables:
+                summary: Generate using all default values
+                value:
+                  templateId: 550e8400-e29b-41d4-a716-446655440000
+      responses:
+        '200':
+          description: Prompt generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromptResponse'
+              examples:
+                generated:
+                  summary: Generated prompt with substituted values
+                  value:
+                    id: 770e8400-e29b-41d4-a716-446655440002
+                    templateId: 550e8400-e29b-41d4-a716-446655440000
+                    versionUsed: 2
+                    content: "Hello John Doe, thank you for being awesome!"
+                    variables:
+                      name: John Doe
+                    createdAt: '2026-05-07T14:45:00Z'
+        '400':
+          description: Validation error (missing required variables)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              examples:
+                missingVariable:
+                  summary: Required variable missing
+                  value:
+                    type: about:blank
+                    title: Validation Error
+                    status: 400
+                    detail: "Missing required variables: firstName, lastName"
+        '404':
+          description: Template not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundErrorResponse'
+
+components:
+  schemas:
+    Tag:
+      type: string
+      description: A simple string label for categorizing templates
+      example: email
+
+    Variable:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the variable
+          readOnly: true
+        name:
+          type: string
+          description: Variable name (used for substitution in template content)
+          example: firstName
+        defaultValue:
+          type: string
+          nullable: true
+          description: Optional default value used if not provided at prompt generation time
+          example: "John"
+      description: A placeholder variable in a template with optional default value
+
+    TemplateResponse:
+      type: object
+      required:
+        - id
+        - name
+        - tags
+        - currentVersion
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the template
+          readOnly: true
+        name:
+          type: string
+          maxLength: 50
+          description: Template name
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tag'
+          description: Array of tag labels
+        currentVersion:
+          type: integer
+          minimum: 1
+          description: Version number of the latest version
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when template was created (ISO 8601)
+          readOnly: true
+      description: Prompt template metadata (without version content)
+
+    TemplateWithVersionResponse:
+      allOf:
+        - $ref: '#/components/schemas/TemplateResponse'
+        - type: object
+          required:
+            - content
+            - variables
+          properties:
+            content:
+              type: string
+              description: Template content with variable placeholders
+            variables:
+              type: array
+              items:
+                $ref: '#/components/schemas/Variable'
+              description: List of variables defined in the current version
+      description: Prompt template with its current version's content and variables
+
+    PromptVersion:
+      type: object
+      required:
+        - versionNumber
+        - templateId
+        - content
+        - variables
+        - tags
+        - createdAt
+      properties:
+        versionNumber:
+          type: integer
+          minimum: 1
+          description: Semantic version number within the template (starting from 1)
+          readOnly: true
+        templateId:
+          type: string
+          format: uuid
+          description: Reference to the parent template
+          readOnly: true
+        content:
+          type: string
+          description: Template content at this version (immutable)
+          readOnly: true
+        variables:
+          type: array
+          items:
+            $ref: '#/components/schemas/Variable'
+          description: List of variables defined in this version
+          readOnly: true
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tag'
+          description: Tags assigned in this version
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when version was created (ISO 8601)
+          readOnly: true
+      description: Point-in-time snapshot of a template's content and configuration
+
+    PromptResponse:
+      type: object
+      required:
+        - id
+        - templateId
+        - versionUsed
+        - content
+        - variables
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the generated prompt
+          readOnly: true
+        templateId:
+          type: string
+          format: uuid
+          description: Reference to the template used
+          readOnly: true
+        versionUsed:
+          type: integer
+          minimum: 1
+          description: Version number of the template used to generate this prompt
+          readOnly: true
+        content:
+          type: string
+          description: Template content with all variables substituted
+          readOnly: true
+        variables:
+          type: object
+          additionalProperties:
+            type: string
+          description: Map of variable names to their resolved values
+          example:
+            name: John Doe
+            age: "30"
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when prompt was generated (ISO 8601)
+          readOnly: true
+      description: Resolved prompt output generated from a template with substituted variable values
+
+    CreateTemplateRequest:
+      type: object
+      required:
+        - name
+        - tags
+        - content
+      properties:
+        name:
+          type: string
+          maxLength: 50
+          description: Template name (must be unique, max 50 characters)
+          example: Customer Email
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tag'
+          minItems: 1
+          description: Array of tag labels for categorization
+          example:
+            - email
+            - customer
+        content:
+          type: string
+          description: Template content with optional variable placeholders
+          example: "Hello {{name}}, thank you for your business!"
+        variables:
+          type: array
+          items:
+            type: object
+            required:
+              - name
+            properties:
+              name:
+                type: string
+                description: Variable name (must be unique within template)
+              defaultValue:
+                type: string
+                nullable: true
+                description: Optional default value
+          description: Array of variables used in the template
+      description: Request body for creating a new template
+
+    UpdateTemplateRequest:
+      type: object
+      properties:
+        content:
+          type: string
+          description: New template content (creates new version if provided)
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tag'
+          minItems: 1
+          description: Updated tag labels (creates new version if provided)
+      description: Request body for updating a template (at least one field required)
+
+    GeneratePromptRequest:
+      type: object
+      required:
+        - templateId
+      properties:
+        templateId:
+          type: string
+          format: uuid
+          description: Reference to the template to use
+        variables:
+          type: object
+          additionalProperties:
+            type: string
+          description: Map of variable names to values for substitution
+          example:
+            name: John Doe
+            age: "30"
+      description: Request body for generating a prompt from a template
+
+    ErrorResponse:
+      type: object
+      required:
+        - type
+        - title
+        - status
+        - detail
+      properties:
+        type:
+          type: string
+          description: RFC 7807 Problem Details error type (URI reference)
+        title:
+          type: string
+          description: Human-readable error title
+        status:
+          type: integer
+          description: HTTP status code
+        detail:
+          type: string
+          description: Detailed error explanation
+        instance:
+          type: string
+          nullable: true
+          description: Optional reference to the specific error occurrence
+      description: RFC 7807 Problem Details error response
+
+    ValidationErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          example:
+            type: about:blank
+            title: Validation Error
+            status: 400
+            detail: "Validation failed: name is required"
+      description: Validation error response (400)
+
+    NotFoundErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          example:
+            type: about:blank
+            title: Template Not Found
+            status: 404
+            detail: "Template with id 'abc123' not found"
+      description: Not found error response (404)
+
+    ConflictErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          example:
+            type: about:blank
+            title: Template Already Exists
+            status: 409
+            detail: "A template with name 'Customer Email' already exists"
+      description: Conflict error response (409)
