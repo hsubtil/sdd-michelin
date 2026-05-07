@@ -5,6 +5,15 @@
 This repository implements a **REST API for managing and versioning prompts**, built with Node.js and NestJS.  
 There is no authentication, rate limiting, or multi-tenancy at this stage.
 
+## Development Approach: API First
+
+This project follows an **API First** approach:
+
+1. **Design the contract first** — define or update the OpenAPI spec (`openapi.yaml` at the repository root) before writing any implementation code
+2. **Generate the spec from code** — after every controller or DTO change, regenerate `openapi.yaml` using the NestJS Swagger CLI plugin
+3. The generated `openapi.yaml` is the **source of truth** for consumers and must always be committed and kept up to date
+4. Never change the API behaviour without first updating the spec
+
 ## Tech Stack
 
 - **Runtime**: Node.js 20+

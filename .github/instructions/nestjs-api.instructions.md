@@ -115,7 +115,59 @@ app.useGlobalPipes(
 - Throw `NotFoundException`, `UnprocessableEntityException`, etc. from use-cases (NestJS HTTP exceptions are acceptable in use-cases since they carry HTTP semantics)
 - Never expose stack traces in production responses
 
-## Swagger Setup
+## API First Approach
+
+This project follows an **API First** workflow. The OpenAPI specification is the contract between the API and its consumers and must always be accurate and up to date.
+
+### Workflow
+
+1. **Design first** — before implementing a new endpoint or modifying an existing one, define or update the contract in the spec
+2. **Implement** — write controllers, DTOs, and decorators to match the contract
+3. **Generate** — run the export script to regenerate `openapi.yaml` and commit the result
+
+### Generating `openapi.yaml`
+
+Add a dedicated script in `package.json` that boots the NestJS app without listening and writes the spec to disk:
+
+```json
+"scripts": {
+  "openapi:generate": "ts-node scripts/generate-openapi.ts"
+}
+```
+
+```typescript
+// scripts/generate-openapi.ts
+import { NestFactory } from '@nestjs/core';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { AppModule } from '../src/app.module';
+import * as fs from 'fs';
+import * as yaml from 'js-yaml';
+
+async function generate(): Promise<void> {
+  const app = await NestFactory.create(AppModule, { logger: false });
+  app.setGlobalPrefix('api/v1');
+
+  const config = new DocumentBuilder()
+    .setTitle('Prompt Versioning API')
+    .setDescription('REST API for managing and versioning prompts')
+    .setVersion('1.0')
+    .build();
+
+  const document = SwaggerModule.createDocument(app, config);
+  fs.writeFileSync('openapi.yaml', yaml.dump(document, { lineWidth: 120 }));
+
+  await app.close();
+}
+
+generate();
+```
+
+- Run `npm run openapi:generate` after every controller or DTO change
+- The generated `openapi.yaml` at the **repository root** must be committed with every API change
+- The spec is the **source of truth** for API consumers — never let it drift from the implementation
+- In CI, add a step that regenerates the spec and fails the build if the committed file differs from the generated one
+
+### Swagger UI Setup
 
 Configure Swagger in `main.ts`:
 

@@ -142,41 +142,65 @@ describe('PromptController (e2e)', () => {
 - Truncate tables before each test or use database transactions that are rolled back after each test
 - Never run E2E tests against the development or production database
 
-### Test Scenarios (E2E)
+### Given / When / Then Pattern (mandatory for E2E tests)
 
-Each E2E test file must cover the **happy path** and the most important **error paths** for an endpoint:
+All E2E test descriptions and bodies **must** follow the **Given / When / Then** structure:
+
+- **`describe` (outer)** — the resource or feature under test (e.g., `PromptController (e2e)`)
+- **`describe` (inner)** — the HTTP action and route (e.g., `POST /api/v1/prompts`)
+- **`it` description** — written as `given <context>, when <action>, then <expected outcome>`
+- **Body** — structured with `// Given`, `// When`, `// Then` comments
 
 ```typescript
+describe('PromptController (e2e)', () => {
   describe('POST /api/v1/prompts', () => {
-    it('should return 201 and the created prompt', async () => {
-      // Arrange
+    it('given valid payload, when creating a prompt, then returns 201 with the created resource', async () => {
+      // Given
       const payload = { label: 'my-prompt', content: 'You are helpful.' };
 
-      // Act & Assert
+      // When
       const response = await request(app.getHttpServer())
         .post('/api/v1/prompts')
-        .send(payload)
-        .expect(201);
+        .send(payload);
 
+      // Then
+      expect(response.status).toBe(201);
       expect(response.body.id).toBeDefined();
       expect(response.body.label).toBe('my-prompt');
     });
 
-    it('should return 422 when content is missing', async () => {
-      await request(app.getHttpServer())
+    it('given missing content, when creating a prompt, then returns 422', async () => {
+      // Given
+      const payload = { label: 'only-label' };
+
+      // When
+      const response = await request(app.getHttpServer())
         .post('/api/v1/prompts')
-        .send({ label: 'only-label' })
-        .expect(422);
+        .send(payload);
+
+      // Then
+      expect(response.status).toBe(422);
     });
 
-    it('should return 422 when unknown fields are sent', async () => {
-      await request(app.getHttpServer())
+    it('given unknown fields in payload, when creating a prompt, then returns 422', async () => {
+      // Given
+      const payload = { label: 'x', content: 'y', unknownField: 'z' };
+
+      // When
+      const response = await request(app.getHttpServer())
         .post('/api/v1/prompts')
-        .send({ label: 'x', content: 'y', unknownField: 'z' })
-        .expect(422);
+        .send(payload);
+
+      // Then
+      expect(response.status).toBe(422);
     });
   });
+});
 ```
+
+### Test Scenarios (E2E)
+
+Each E2E test file must cover the **happy path** and the most important **error paths** for an endpoint.
 
 ## Coverage
 
