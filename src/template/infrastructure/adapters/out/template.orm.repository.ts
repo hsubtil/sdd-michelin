@@ -5,6 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 
 import { TemplateVariable } from '@/template/domain/entities/template-variable.entity';
+import { TemplateVersion } from '@/template/domain/entities/template-version.entity';
 import { Template } from '@/template/domain/entities/template.entity';
 import { ITemplateRepository } from '@/template/domain/ports/out/i-template.repository';
 import { TemplateVersionOrm } from '@/template/infrastructure/persistence/entities/template-version.orm.entity';
@@ -23,30 +24,11 @@ export class TemplateOrmRepository implements ITemplateRepository {
     private readonly dataSource: DataSource,
   ) {}
 
-  async findByName(name: string): Promise<Template | null> {
-    const templateOrm = await this.templateRepository.findOne({
-      where: { name },
-      relations: {
-        versions: {
-          variables: true,
-        },
-      },
-      order: {
-        versions: {
-          versionNumber: 'DESC',
-        },
-      },
-    });
-
-    if (!templateOrm || templateOrm.versions.length === 0) {
-      return null;
-    }
-
+  private buildTemplateFromOrm(templateOrm: TemplateOrm): Template {
     const latestVersion = templateOrm.versions[0];
-    const variables = latestVersion.variables.map((variable) =>
-      TemplateVariable.reconstitute(variable.id, variable.name, variable.defaultValue),
+    const variables = latestVersion.variables.map((v) =>
+      TemplateVariable.reconstitute(v.id, v.name, v.defaultValue),
     );
-
     return Template.reconstitute({
       id: templateOrm.id,
       name: templateOrm.name,
@@ -58,6 +40,75 @@ export class TemplateOrmRepository implements ITemplateRepository {
     });
   }
 
+  async findByName(name: string): Promise<Template | null> {
+    const templateOrm = await this.templateRepository.findOne({
+      where: { name },
+      relations: { versions: { variables: true } },
+      order: { versions: { versionNumber: 'DESC' } },
+    });
+    if (!templateOrm || templateOrm.versions.length === 0) {
+      return null;
+    }
+    return this.buildTemplateFromOrm(templateOrm);
+  }
+
+  async findById(id: string): Promise<Template | null> {
+    const templateOrm = await this.templateRepository.findOne({
+      where: { id },
+      relations: { versions: { variables: true } },
+      order: { versions: { versionNumber: 'DESC' } },
+    });
+    if (!templateOrm || templateOrm.versions.length === 0) {
+      return null;
+    }
+    return this.buildTemplateFromOrm(templateOrm);
+  }
+
+  async findVersionsByTemplateId(templateId: string): Promise<TemplateVersion[]> {
+    const versions = await this.versionRepository.find({
+      where: { templateId },
+      relations: { variables: true },
+      order: { versionNumber: 'DESC' },
+    });
+    return versions.map((v) =>
+      TemplateVersion.reconstitute({
+        id: v.id,
+        templateId: v.templateId,
+        versionNumber: v.versionNumber,
+        content: v.content,
+        tags: v.tags,
+        variables: v.variables.map((vv) =>
+          TemplateVariable.reconstitute(vv.id, vv.name, vv.defaultValue),
+        ),
+        createdAt: v.createdAt,
+      }),
+    );
+  }
+
+  async findVersionByNumber(
+    templateId: string,
+    versionNumber: number,
+  ): Promise<TemplateVersion | null> {
+    const v = await this.versionRepository.findOne({
+      where: { templateId, versionNumber },
+      relations: { variables: true },
+    });
+    if (!v) {
+      return null;
+    }
+    return TemplateVersion.reconstitute({
+      id: v.id,
+      templateId: v.templateId,
+      versionNumber: v.versionNumber,
+      content: v.content,
+      tags: v.tags,
+      variables: v.variables.map((vv) =>
+        TemplateVariable.reconstitute(vv.id, vv.name, vv.defaultValue),
+      ),
+      createdAt: v.createdAt,
+    });
+  }
+
   async createTemplateWithInitialVersion(template: Template): Promise<Template> {
     await this.dataSource.transaction(async (manager) => {
       const templateOrm = this.templateRepository.create({
@@ -66,7 +117,6 @@ export class TemplateOrmRepository implements ITemplateRepository {
         currentVersion: template.currentVersion,
         createdAt: template.createdAt,
       });
-
       await manager.save(TemplateOrm, templateOrm);
 
       const versionOrm = this.versionRepository.create({
@@ -77,7 +127,6 @@ export class TemplateOrmRepository implements ITemplateRepository {
         tags: [...template.tags],
         createdAt: template.createdAt,
       });
-
       await manager.save(TemplateVersionOrm, versionOrm);
 
       const variableOrms = template.variables.map((variable) =>
@@ -88,12 +137,68 @@ export class TemplateOrmRepository implements ITemplateRepository {
           defaultValue: variable.defaultValue,
         }),
       );
-
       if (variableOrms.length > 0) {
         await manager.save(VariableOrm, variableOrms);
       }
     });
-
     return template;
   }
+
+  async addNewVersion(
+    templateId: string,
+    data: { content: string; tags: string[]; variables: TemplateVariable[] },
+  ): Promise<Template> {
+    return this.dataSource.transaction(async (manager) => {
+      const templateOrm = await manager.findOne(TemplateOrm, {
+        where: { id: templateId },
+      });
+
+      if (!templateOrm) {
+        throw new Error(`Template ${templateId} not found`);
+      }
+
+      const newVersionNumber = templateOrm.currentVersion + 1;
+      const newVersionId = randomUUID();
+      const now = new Date();
+
+      const versionOrm = this.versionRepository.create({
+        id: newVersionId,
+        templateId,
+        versionNumber: newVersionNumber,
+        content: data.content,
+        tags: [...data.tags],
+        createdAt: now,
+      });
+      await manager.save(TemplateVersionOrm, versionOrm);
+
+      const variableOrms = data.variables.map((v) =>
+        this.variableRepository.create({
+          id: randomUUID(),
+          templateVersionId: newVersionId,
+          name: v.name,
+          defaultValue: v.defaultValue,
+        }),
+      );
+      if (variableOrms.length > 0) {
+        await manager.save(VariableOrm, variableOrms);
+      }
+
+      await manager.update(TemplateOrm, { id: templateId }, { currentVersion: newVersionNumber });
+
+      const variables = variableOrms.map((vo) =>
+        TemplateVariable.reconstitute(vo.id, vo.name, vo.defaultValue),
+      );
+
+      return Template.reconstitute({
+        id: templateOrm.id,
+        name: templateOrm.name,
+        tags: data.tags,
+        content: data.content,
+        variables,
+        currentVersion: newVersionNumber,
+        createdAt: templateOrm.createdAt,
+      });
+    });
+  }
 }
+

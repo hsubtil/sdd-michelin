@@ -16,7 +16,11 @@ describe('CreateTemplateUseCase', () => {
   it('creates a template when the name is available', async () => {
     const repository: ITemplateRepository = {
       findByName: jest.fn().mockResolvedValue(null),
+      findById: jest.fn(),
       createTemplateWithInitialVersion: jest.fn().mockImplementation(async (template: Template) => template),
+      addNewVersion: jest.fn(),
+      findVersionsByTemplateId: jest.fn(),
+      findVersionByNumber: jest.fn(),
     };
 
     const useCase = new CreateTemplateUseCase(repository);
@@ -38,7 +42,11 @@ describe('CreateTemplateUseCase', () => {
           variables: [],
         }),
       ),
+      findById: jest.fn(),
       createTemplateWithInitialVersion: jest.fn(),
+      addNewVersion: jest.fn(),
+      findVersionsByTemplateId: jest.fn(),
+      findVersionByNumber: jest.fn(),
     };
 
     const useCase = new CreateTemplateUseCase(repository);
