@@ -10,6 +10,8 @@ export interface ITemplateRepository {
   findByName(name: string): Promise<Template | null>;
   /** Find a template by its UUID, populated with the latest version (returns null if not found). */
   findById(id: string): Promise<Template | null>;
+  /** Return all templates populated with their latest version, newest first. */
+  findAll(): Promise<Template[]>;
   /** Persist a new template with its first version. */
   createTemplateWithInitialVersion(template: Template): Promise<Template>;
   /** Create a new version for an existing template, carrying over variables. */
@@ -20,5 +22,8 @@ export interface ITemplateRepository {
   /** Return all versions of a template ordered by version number descending. */
   findVersionsByTemplateId(templateId: string): Promise<TemplateVersion[]>;
   /** Return a specific version of a template, or null if not found. */
-  findVersionByNumber(templateId: string, versionNumber: number): Promise<TemplateVersion | null>;
+  findVersionByNumber(
+    templateId: string,
+    versionNumber: number,
+  ): Promise<TemplateVersion | null>;
 }

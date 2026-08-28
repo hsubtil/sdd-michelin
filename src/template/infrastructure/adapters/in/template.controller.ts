@@ -1,20 +1,21 @@
 import {
-    Body,
-    Controller,
-    Get,
-    HttpCode,
-    HttpStatus,
-    Inject,
-    Param,
-    ParseIntPipe,
-    ParseUUIDPipe,
-    Post,
-    Put,
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Inject,
+  Param,
+  ParseIntPipe,
+  ParseUUIDPipe,
+  Post,
+  Put,
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { CreateTemplateResponseDto } from '@/template/application/dto/create-template-response.dto';
 import { CreateTemplateDto } from '@/template/application/dto/create-template.dto';
+import { TemplateSummaryResponseDto } from '@/template/application/dto/template-summary-response.dto';
 import { TemplateVersionResponseDto } from '@/template/application/dto/template-version-response.dto';
 import { TemplateWithVersionResponseDto } from '@/template/application/dto/template-with-version-response.dto';
 import { UpdateTemplateDto } from '@/template/application/dto/update-template.dto';
@@ -22,13 +23,15 @@ import { ICreateTemplateUseCase } from '@/template/domain/ports/in/i-create-temp
 import { IGetTemplateVersionUseCase } from '@/template/domain/ports/in/i-get-template-version.use-case';
 import { IGetTemplateVersionsUseCase } from '@/template/domain/ports/in/i-get-template-versions.use-case';
 import { IGetTemplateUseCase } from '@/template/domain/ports/in/i-get-template.use-case';
+import { IListTemplatesUseCase } from '@/template/domain/ports/in/i-list-templates.use-case';
 import { IUpdateTemplateUseCase } from '@/template/domain/ports/in/i-update-template.use-case';
 import {
-    CREATE_TEMPLATE_USE_CASE,
-    GET_TEMPLATE_USE_CASE,
-    GET_TEMPLATE_VERSION_USE_CASE,
-    GET_TEMPLATE_VERSIONS_USE_CASE,
-    UPDATE_TEMPLATE_USE_CASE,
+  CREATE_TEMPLATE_USE_CASE,
+  GET_TEMPLATE_USE_CASE,
+  GET_TEMPLATE_VERSION_USE_CASE,
+  GET_TEMPLATE_VERSIONS_USE_CASE,
+  LIST_TEMPLATES_USE_CASE,
+  UPDATE_TEMPLATE_USE_CASE,
 } from '@/template/template.tokens';
 
 @ApiTags('Templates')
@@ -45,12 +48,31 @@ export class TemplateController {
     private readonly getTemplateVersionsUseCase: IGetTemplateVersionsUseCase,
     @Inject(GET_TEMPLATE_VERSION_USE_CASE)
     private readonly getTemplateVersionUseCase: IGetTemplateVersionUseCase,
+    @Inject(LIST_TEMPLATES_USE_CASE)
+    private readonly listTemplatesUseCase: IListTemplatesUseCase,
   ) {}
+
+  @Get()
+  @ApiOperation({
+    summary: 'Retrieve all templates with their latest version metadata',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Templates retrieved',
+    type: [TemplateSummaryResponseDto],
+  })
+  listTemplates(): Promise<TemplateSummaryResponseDto[]> {
+    return this.listTemplatesUseCase.execute();
+  }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new template with initial content' })
-  @ApiResponse({ status: 201, description: 'Template created', type: CreateTemplateResponseDto })
+  @ApiResponse({
+    status: 201,
+    description: 'Template created',
+    type: CreateTemplateResponseDto,
+  })
   @ApiResponse({ status: 400, description: 'Validation error' })
   @ApiResponse({ status: 409, description: 'Template name already exists' })
   create(@Body() dto: CreateTemplateDto): Promise<CreateTemplateResponseDto> {
@@ -60,16 +82,26 @@ export class TemplateController {
   @Get(':id')
   @ApiOperation({ summary: 'Retrieve a template with its latest version' })
   @ApiParam({ name: 'id', description: 'Template UUID', format: 'uuid' })
-  @ApiResponse({ status: 200, description: 'Template retrieved', type: TemplateWithVersionResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Template retrieved',
+    type: TemplateWithVersionResponseDto,
+  })
   @ApiResponse({ status: 404, description: 'Template not found' })
-  getTemplate(@Param('id', ParseUUIDPipe) id: string): Promise<TemplateWithVersionResponseDto> {
+  getTemplate(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<TemplateWithVersionResponseDto> {
     return this.getTemplateUseCase.execute(id);
   }
 
   @Put(':id')
   @ApiOperation({ summary: 'Update template content (creates a new version)' })
   @ApiParam({ name: 'id', description: 'Template UUID', format: 'uuid' })
-  @ApiResponse({ status: 200, description: 'Template updated', type: TemplateWithVersionResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Template updated',
+    type: TemplateWithVersionResponseDto,
+  })
   @ApiResponse({ status: 400, description: 'Validation error' })
   @ApiResponse({ status: 404, description: 'Template not found' })
   updateTemplate(
@@ -82,17 +114,31 @@ export class TemplateController {
   @Get(':id/versions')
   @ApiOperation({ summary: 'Retrieve all versions of a template' })
   @ApiParam({ name: 'id', description: 'Template UUID', format: 'uuid' })
-  @ApiResponse({ status: 200, description: 'Versions retrieved', type: [TemplateVersionResponseDto] })
+  @ApiResponse({
+    status: 200,
+    description: 'Versions retrieved',
+    type: [TemplateVersionResponseDto],
+  })
   @ApiResponse({ status: 404, description: 'Template not found' })
-  getVersions(@Param('id', ParseUUIDPipe) id: string): Promise<TemplateVersionResponseDto[]> {
+  getVersions(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<TemplateVersionResponseDto[]> {
     return this.getTemplateVersionsUseCase.execute(id);
   }
 
   @Get(':id/versions/:versionNumber')
   @ApiOperation({ summary: 'Retrieve a specific version of a template' })
   @ApiParam({ name: 'id', description: 'Template UUID', format: 'uuid' })
-  @ApiParam({ name: 'versionNumber', description: 'Version number', type: Number })
-  @ApiResponse({ status: 200, description: 'Version retrieved', type: TemplateVersionResponseDto })
+  @ApiParam({
+    name: 'versionNumber',
+    description: 'Version number',
+    type: Number,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Version retrieved',
+    type: TemplateVersionResponseDto,
+  })
   @ApiResponse({ status: 404, description: 'Template or version not found' })
   getVersion(
     @Param('id', ParseUUIDPipe) id: string,

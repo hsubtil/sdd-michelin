@@ -1,6 +1,21 @@
 openapi: 3.0.0
 paths:
   /api/v1/template:
+    get:
+      operationId: TemplateController_listTemplates
+      parameters: []
+      responses:
+        '200':
+          description: Templates retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TemplateSummaryResponseDto'
+      summary: Retrieve all templates with their latest version metadata
+      tags: &ref_0
+        - Templates
     post:
       operationId: TemplateController_create
       parameters: []
@@ -22,8 +37,7 @@ paths:
         '409':
           description: Template name already exists
       summary: Create a new template with initial content
-      tags: &ref_0
-        - Templates
+      tags: *ref_0
   /api/v1/template/{id}:
     get:
       operationId: TemplateController_getTemplate
@@ -160,6 +174,43 @@ tags: []
 servers: []
 components:
   schemas:
+    TemplateSummaryResponseDto:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the template
+          format: uuid
+          example: 550e8400-e29b-41d4-a716-446655440000
+        name:
+          type: string
+          description: Template name
+          maxLength: 50
+          example: Customer Email
+        tags:
+          description: Array of tag labels of the latest version
+          example:
+            - email
+            - customer
+          type: array
+          items:
+            type: array
+        currentVersion:
+          type: number
+          description: Version number of the latest version
+          minimum: 1
+          example: 1
+        createdAt:
+          type: string
+          description: Timestamp when template was created (ISO 8601)
+          format: date-time
+          example: '2026-05-07T10:30:00Z'
+      required:
+        - id
+        - name
+        - tags
+        - currentVersion
+        - createdAt
     CreateTemplateVariableDto:
       type: object
       properties:

@@ -64,7 +64,19 @@ export class TemplateOrmRepository implements ITemplateRepository {
     return this.buildTemplateFromOrm(templateOrm);
   }
 
-  async findVersionsByTemplateId(templateId: string): Promise<TemplateVersion[]> {
+  async findAll(): Promise<Template[]> {
+    const templateOrms = await this.templateRepository.find({
+      relations: { versions: { variables: true } },
+      order: { createdAt: 'DESC', versions: { versionNumber: 'DESC' } },
+    });
+    return templateOrms
+      .filter((templateOrm) => templateOrm.versions.length > 0)
+      .map((templateOrm) => this.buildTemplateFromOrm(templateOrm));
+  }
+
+  async findVersionsByTemplateId(
+    templateId: string,
+  ): Promise<TemplateVersion[]> {
     const versions = await this.versionRepository.find({
       where: { templateId },
       relations: { variables: true },
@@ -109,7 +121,9 @@ export class TemplateOrmRepository implements ITemplateRepository {
     });
   }
 
-  async createTemplateWithInitialVersion(template: Template): Promise<Template> {
+  async createTemplateWithInitialVersion(
+    template: Template,
+  ): Promise<Template> {
     await this.dataSource.transaction(async (manager) => {
       const templateOrm = this.templateRepository.create({
         id: template.id,
@@ -183,7 +197,11 @@ export class TemplateOrmRepository implements ITemplateRepository {
         await manager.save(VariableOrm, variableOrms);
       }
 
-      await manager.update(TemplateOrm, { id: templateId }, { currentVersion: newVersionNumber });
+      await manager.update(
+        TemplateOrm,
+        { id: templateId },
+        { currentVersion: newVersionNumber },
+      );
 
       const variables = variableOrms.map((vo) =>
         TemplateVariable.reconstitute(vo.id, vo.name, vo.defaultValue),
@@ -201,4 +219,3 @@ export class TemplateOrmRepository implements ITemplateRepository {
     });
   }
 }
-
