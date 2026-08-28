@@ -4,6 +4,10 @@ export class ReconcileTemplatesSchema1746622000000 implements MigrationInterface
   name = 'ReconcileTemplatesSchema1746622000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (queryRunner.connection.options.type === 'mysql') {
+      return;
+    }
+
     const hasTemplatesTable = await queryRunner.hasTable('templates');
     if (!hasTemplatesTable) {
       return;
@@ -11,7 +15,9 @@ export class ReconcileTemplatesSchema1746622000000 implements MigrationInterface
 
     const hasName = await queryRunner.hasColumn('templates', 'name');
     if (!hasName) {
-      await queryRunner.query('ALTER TABLE "templates" ADD COLUMN "name" character varying(50)');
+      await queryRunner.query(
+        'ALTER TABLE "templates" ADD COLUMN "name" character varying(50)',
+      );
     }
 
     const hasSignature = await queryRunner.hasColumn('templates', 'signature');
@@ -25,12 +31,20 @@ export class ReconcileTemplatesSchema1746622000000 implements MigrationInterface
       'UPDATE "templates" SET "name" = LEFT("id"::text, 50) WHERE "name" IS NULL',
     );
 
-    const hasCurrentVersion = await queryRunner.hasColumn('templates', 'current_version');
+    const hasCurrentVersion = await queryRunner.hasColumn(
+      'templates',
+      'current_version',
+    );
     if (!hasCurrentVersion) {
-      await queryRunner.query('ALTER TABLE "templates" ADD COLUMN "current_version" integer');
+      await queryRunner.query(
+        'ALTER TABLE "templates" ADD COLUMN "current_version" integer',
+      );
     }
 
-    const hasCurrentVersionLegacy = await queryRunner.hasColumn('templates', 'currentVersion');
+    const hasCurrentVersionLegacy = await queryRunner.hasColumn(
+      'templates',
+      'currentVersion',
+    );
     if (hasCurrentVersionLegacy) {
       await queryRunner.query(
         'UPDATE "templates" SET "current_version" = "currentVersion" WHERE "current_version" IS NULL',
@@ -48,7 +62,10 @@ export class ReconcileTemplatesSchema1746622000000 implements MigrationInterface
       );
     }
 
-    const hasCreatedAtLegacy = await queryRunner.hasColumn('templates', 'createdAt');
+    const hasCreatedAtLegacy = await queryRunner.hasColumn(
+      'templates',
+      'createdAt',
+    );
     if (hasCreatedAtLegacy) {
       await queryRunner.query(
         'UPDATE "templates" SET "created_at" = "createdAt" WHERE "created_at" IS NULL',
@@ -59,9 +76,15 @@ export class ReconcileTemplatesSchema1746622000000 implements MigrationInterface
       'UPDATE "templates" SET "created_at" = now() WHERE "created_at" IS NULL',
     );
 
-    await queryRunner.query('ALTER TABLE "templates" ALTER COLUMN "name" SET NOT NULL');
-    await queryRunner.query('ALTER TABLE "templates" ALTER COLUMN "current_version" SET NOT NULL');
-    await queryRunner.query('ALTER TABLE "templates" ALTER COLUMN "created_at" SET NOT NULL');
+    await queryRunner.query(
+      'ALTER TABLE "templates" ALTER COLUMN "name" SET NOT NULL',
+    );
+    await queryRunner.query(
+      'ALTER TABLE "templates" ALTER COLUMN "current_version" SET NOT NULL',
+    );
+    await queryRunner.query(
+      'ALTER TABLE "templates" ALTER COLUMN "created_at" SET NOT NULL',
+    );
 
     await queryRunner.query(`
       DO $$

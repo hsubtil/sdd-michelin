@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { DataSource } from 'typeorm';
 
 const dataSource = new DataSource({
-  type: 'postgres',
+  type: process.env.DB_TYPE === 'mysql' ? 'mysql' : 'postgres',
   host: process.env.DB_HOST,
   port: Number(process.env.DB_PORT ?? 5432),
   username: process.env.DB_USER,

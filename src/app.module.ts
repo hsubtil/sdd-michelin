@@ -16,7 +16,7 @@ import { VersionModule } from './version/version.module';
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        type: 'postgres' as const,
+        type: config.getOrThrow<'postgres' | 'mysql'>('DB_TYPE'),
         host: config.get<string>('DB_HOST'),
         port: config.get<number>('DB_PORT'),
         username: config.get<string>('DB_USER'),

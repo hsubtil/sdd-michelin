@@ -3,18 +3,68 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
-      POSTGRES_DB: ${DB_NAME:-prompt_versioning}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-prompt_versioning}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-prompt_versioning}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-prompt_versioning}",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
+
+  db-mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-prompt_versioning}
+      MYSQL_USER: ${DB_USER:-prompt_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-mysql}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h localhost -u${DB_USER:-prompt_user} -p${DB_PASSWORD:-mysql} --silent",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+    ports:
+      - "5050:80"
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    restart: unless-stopped
+    depends_on:
+      db-mysql:
+        condition: service_healthy
+    environment:
+      PMA_HOST: db-mysql
+      PMA_PORT: 3306
+    ports:
+      - "8080:80"
 
   app:
     build:
@@ -24,11 +74,14 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      db-mysql:
+        condition: service_healthy
     environment:
       NODE_ENV: production
       PORT: 3000
-      DB_HOST: db
-      DB_PORT: 5432
+      DB_TYPE: ${APP_DB_TYPE:-postgres}
+      DB_HOST: ${APP_DB_HOST:-db}
+      DB_PORT: ${APP_DB_PORT:-5432}
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
       DB_NAME: ${DB_NAME:-prompt_versioning}
@@ -37,3 +90,4 @@ services:
 
 volumes:
   postgres_data:
+  mysql_data:
