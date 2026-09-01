@@ -5,20 +5,25 @@ import request from 'supertest';
 
 import { ProblemDetailsFilter } from '@/common/filters/problem-details.filter';
 import { CreateTemplateUseCase } from '@/template/application/use-cases/create-template.use-case';
-import { GetTemplateUseCase } from '@/template/application/use-cases/get-template.use-case';
 import { GetTemplateVersionUseCase } from '@/template/application/use-cases/get-template-version.use-case';
 import { GetTemplateVersionsUseCase } from '@/template/application/use-cases/get-template-versions.use-case';
+import { GetTemplateUseCase } from '@/template/application/use-cases/get-template.use-case';
+import { ListTemplatesUseCase } from '@/template/application/use-cases/list-templates.use-case';
 import { UpdateTemplateUseCase } from '@/template/application/use-cases/update-template.use-case';
 import { TemplateVariable } from '@/template/domain/entities/template-variable.entity';
 import { TemplateVersion } from '@/template/domain/entities/template-version.entity';
 import { Template } from '@/template/domain/entities/template.entity';
-import { ITemplateRepository } from '@/template/domain/ports/out/i-template.repository';
+import {
+  ITemplateRepository,
+  TemplateSearchCriteria,
+} from '@/template/domain/ports/out/i-template.repository';
 import { TemplateController } from '@/template/infrastructure/adapters/in/template.controller';
 import {
   CREATE_TEMPLATE_USE_CASE,
   GET_TEMPLATE_USE_CASE,
   GET_TEMPLATE_VERSION_USE_CASE,
   GET_TEMPLATE_VERSIONS_USE_CASE,
+  LIST_TEMPLATES_USE_CASE,
   TEMPLATE_REPOSITORY,
   UPDATE_TEMPLATE_USE_CASE,
 } from '@/template/template.tokens';
@@ -30,7 +35,10 @@ describe('TemplateController (e2e)', () => {
   const nameIndex = new Map<string, string>();
 
   const repositoryMock: ITemplateRepository = {
-    findByName: jest.fn(async (name: string) => templateStore.get(nameIndex.get(name) ?? '') ?? null),
+    findByName: jest.fn(
+      async (name: string) =>
+        templateStore.get(nameIndex.get(name) ?? '') ?? null,
+    ),
     findById: jest.fn(async (id: string) => templateStore.get(id) ?? null),
     createTemplateWithInitialVersion: jest.fn(async (template: Template) => {
       templateStore.set(template.id, template);
@@ -72,20 +80,38 @@ describe('TemplateController (e2e)', () => {
         }),
       ];
     }),
-    findVersionByNumber: jest.fn(async (templateId: string, versionNumber: number) => {
-      const tmpl = templateStore.get(templateId);
-      if (!tmpl || tmpl.currentVersion !== versionNumber) return null;
-      return TemplateVersion.reconstitute({
-        id: 'version-id',
-        templateId,
-        versionNumber,
-        content: tmpl.content,
-        tags: [...tmpl.tags],
-        variables: [...tmpl.variables].map((v) =>
-          TemplateVariable.reconstitute(v.id, v.name, v.defaultValue),
-        ),
-        createdAt: tmpl.createdAt,
-      });
+    findVersionByNumber: jest.fn(
+      async (templateId: string, versionNumber: number) => {
+        const tmpl = templateStore.get(templateId);
+        if (!tmpl || tmpl.currentVersion !== versionNumber) return null;
+        return TemplateVersion.reconstitute({
+          id: 'version-id',
+          templateId,
+          versionNumber,
+          content: tmpl.content,
+          tags: [...tmpl.tags],
+          variables: [...tmpl.variables].map((v) =>
+            TemplateVariable.reconstitute(v.id, v.name, v.defaultValue),
+          ),
+          createdAt: tmpl.createdAt,
+        });
+      },
+    ),
+    findAll: jest.fn(async (criteria?: TemplateSearchCriteria) => {
+      let templates = [...templateStore.values()];
+      if (criteria?.name) {
+        const search = criteria.name.toLowerCase();
+        templates = templates.filter((t) =>
+          t.name.toLowerCase().includes(search),
+        );
+      }
+      if (criteria?.tags && criteria.tags.length > 0) {
+        const wanted = new Set(criteria.tags);
+        templates = templates.filter((t) =>
+          t.tags.some((tag) => wanted.has(tag)),
+        );
+      }
+      return templates;
     }),
   };
 
@@ -97,8 +123,15 @@ describe('TemplateController (e2e)', () => {
         { provide: CREATE_TEMPLATE_USE_CASE, useClass: CreateTemplateUseCase },
         { provide: GET_TEMPLATE_USE_CASE, useClass: GetTemplateUseCase },
         { provide: UPDATE_TEMPLATE_USE_CASE, useClass: UpdateTemplateUseCase },
-        { provide: GET_TEMPLATE_VERSIONS_USE_CASE, useClass: GetTemplateVersionsUseCase },
-        { provide: GET_TEMPLATE_VERSION_USE_CASE, useClass: GetTemplateVersionUseCase },
+        {
+          provide: GET_TEMPLATE_VERSIONS_USE_CASE,
+          useClass: GetTemplateVersionsUseCase,
+        },
+        {
+          provide: GET_TEMPLATE_VERSION_USE_CASE,
+          useClass: GetTemplateVersionUseCase,
+        },
+        { provide: LIST_TEMPLATES_USE_CASE, useClass: ListTemplatesUseCase },
       ],
     }).compile();
 
@@ -106,7 +139,11 @@ describe('TemplateController (e2e)', () => {
     app.setGlobalPrefix('api/v1');
     app.useGlobalFilters(new ProblemDetailsFilter());
     app.useGlobalPipes(
-      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
     );
     await app.init();
   });
@@ -196,5 +233,29 @@ describe('TemplateController (e2e)', () => {
 
     expect(response.body.versionNumber).toBe(2);
     expect(response.body.templateId).toBe(createdTemplateId);
+  });
+
+  it('GET /template?name= — filters templates by name text search', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/v1/template')
+      .query({ name: 'e2e temp' })
+      .expect(200);
+
+    expect(response.body).toHaveLength(1);
+    expect(response.body[0].id).toBe(createdTemplateId);
+  });
+
+  it('GET /template?tags= — filters templates by tags', async () => {
+    const matching = await request(app.getHttpServer())
+      .get('/api/v1/template')
+      .query({ tags: 'e2e' })
+      .expect(200);
+    expect(matching.body).toHaveLength(1);
+
+    const noMatch = await request(app.getHttpServer())
+      .get('/api/v1/template')
+      .query({ tags: 'unknown-tag' })
+      .expect(200);
+    expect(noMatch.body).toHaveLength(0);
   });
 });

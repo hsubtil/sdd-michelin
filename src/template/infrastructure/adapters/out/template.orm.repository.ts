@@ -7,7 +7,10 @@ import { DataSource, Repository } from 'typeorm';
 import { TemplateVariable } from '@/template/domain/entities/template-variable.entity';
 import { TemplateVersion } from '@/template/domain/entities/template-version.entity';
 import { Template } from '@/template/domain/entities/template.entity';
-import { ITemplateRepository } from '@/template/domain/ports/out/i-template.repository';
+import {
+  ITemplateRepository,
+  TemplateSearchCriteria,
+} from '@/template/domain/ports/out/i-template.repository';
 import { TemplateVersionOrm } from '@/template/infrastructure/persistence/entities/template-version.orm.entity';
 import { TemplateOrm } from '@/template/infrastructure/persistence/entities/template.orm.entity';
 import { VariableOrm } from '@/template/infrastructure/persistence/entities/variable.orm.entity';
@@ -64,14 +67,33 @@ export class TemplateOrmRepository implements ITemplateRepository {
     return this.buildTemplateFromOrm(templateOrm);
   }
 
-  async findAll(): Promise<Template[]> {
-    const templateOrms = await this.templateRepository.find({
-      relations: { versions: { variables: true } },
-      order: { createdAt: 'DESC', versions: { versionNumber: 'DESC' } },
-    });
-    return templateOrms
+  async findAll(criteria?: TemplateSearchCriteria): Promise<Template[]> {
+    const query = this.templateRepository
+      .createQueryBuilder('template')
+      .leftJoinAndSelect('template.versions', 'version')
+      .leftJoinAndSelect('version.variables', 'variable')
+      .orderBy('template.createdAt', 'DESC')
+      .addOrderBy('version.versionNumber', 'DESC');
+
+    if (criteria?.name) {
+      query.andWhere('template.name ILIKE :name', {
+        name: `%${criteria.name}%`,
+      });
+    }
+
+    const templateOrms = await query.getMany();
+    const templates = templateOrms
       .filter((templateOrm) => templateOrm.versions.length > 0)
       .map((templateOrm) => this.buildTemplateFromOrm(templateOrm));
+
+    if (criteria?.tags && criteria.tags.length > 0) {
+      const wantedTags = new Set(criteria.tags);
+      return templates.filter((template) =>
+        template.tags.some((tag) => wantedTags.has(tag)),
+      );
+    }
+
+    return templates;
   }
 
   async findVersionsByTemplateId(

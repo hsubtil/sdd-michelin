@@ -3,7 +3,21 @@ paths:
   /api/v1/template:
     get:
       operationId: TemplateController_listTemplates
-      parameters: []
+      parameters:
+        - name: name
+          required: false
+          in: query
+          description: Text search on template name (case-insensitive, partial match)
+          schema:
+            example: customer
+            type: string
+        - name: tags
+          required: false
+          in: query
+          description: Comma-separated list of tags to filter by
+          schema:
+            type: string
+            example: email,customer
       responses:
         '200':
           description: Templates retrieved
@@ -13,7 +27,7 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/TemplateSummaryResponseDto'
-      summary: Retrieve all templates with their latest version metadata
+      summary: Retrieve all templates with their latest version metadata, optionally filtered by name and/or tags
       tags: &ref_0
         - Templates
     post:

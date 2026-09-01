@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 
+import { ListTemplatesQueryDto } from '@/template/application/dto/list-templates-query.dto';
 import { TemplateSummaryResponseDto } from '@/template/application/dto/template-summary-response.dto';
 import { TemplateResponseMapper } from '@/template/application/mappers/template-response.mapper';
 import { IListTemplatesUseCase } from '@/template/domain/ports/in/i-list-templates.use-case';
@@ -13,8 +14,13 @@ export class ListTemplatesUseCase implements IListTemplatesUseCase {
     private readonly templateRepository: ITemplateRepository,
   ) {}
 
-  async execute(): Promise<TemplateSummaryResponseDto[]> {
-    const templates = await this.templateRepository.findAll();
+  async execute(
+    query?: ListTemplatesQueryDto,
+  ): Promise<TemplateSummaryResponseDto[]> {
+    const templates = await this.templateRepository.findAll({
+      name: query?.name,
+      tags: query?.tags,
+    });
     return templates.map((template) =>
       TemplateResponseMapper.toTemplateSummaryResponse(template),
     );

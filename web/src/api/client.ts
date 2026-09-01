@@ -31,7 +31,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  listTemplates: () => request<TemplateSummary[]>('/template'),
+  listTemplates: (filters?: { name?: string; tags?: string[] }) => {
+    const params = new URLSearchParams();
+    if (filters?.name) {
+      params.set('name', filters.name);
+    }
+    if (filters?.tags?.length) {
+      params.set('tags', filters.tags.join(','));
+    }
+    const query = params.toString();
+    return request<TemplateSummary[]>(`/template${query ? `?${query}` : ''}`);
+  },
   getTemplate: (id: string) => request<TemplateWithVersion>(`/template/${id}`),
   getVersions: (id: string) =>
     request<TemplateVersion[]>(`/template/${id}/versions`),

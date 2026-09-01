@@ -10,11 +10,19 @@ import {
   ParseUUIDPipe,
   Post,
   Put,
+  Query,
 } from '@nestjs/common';
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 
 import { CreateTemplateResponseDto } from '@/template/application/dto/create-template-response.dto';
 import { CreateTemplateDto } from '@/template/application/dto/create-template.dto';
+import { ListTemplatesQueryDto } from '@/template/application/dto/list-templates-query.dto';
 import { TemplateSummaryResponseDto } from '@/template/application/dto/template-summary-response.dto';
 import { TemplateVersionResponseDto } from '@/template/application/dto/template-version-response.dto';
 import { TemplateWithVersionResponseDto } from '@/template/application/dto/template-with-version-response.dto';
@@ -54,15 +62,32 @@ export class TemplateController {
 
   @Get()
   @ApiOperation({
-    summary: 'Retrieve all templates with their latest version metadata',
+    summary:
+      'Retrieve all templates with their latest version metadata, optionally filtered by name and/or tags',
+  })
+  @ApiQuery({
+    name: 'name',
+    required: false,
+    type: String,
+    example: 'customer',
+    description:
+      'Text search on template name (case-insensitive, partial match)',
+  })
+  @ApiQuery({
+    name: 'tags',
+    required: false,
+    schema: { type: 'string', example: 'email,customer' },
+    description: 'Comma-separated list of tags to filter by',
   })
   @ApiResponse({
     status: 200,
     description: 'Templates retrieved',
     type: [TemplateSummaryResponseDto],
   })
-  listTemplates(): Promise<TemplateSummaryResponseDto[]> {
-    return this.listTemplatesUseCase.execute();
+  listTemplates(
+    @Query() query: ListTemplatesQueryDto,
+  ): Promise<TemplateSummaryResponseDto[]> {
+    return this.listTemplatesUseCase.execute(query);
   }
 
   @Post()
